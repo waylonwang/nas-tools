@@ -110,7 +110,7 @@ class DbHelper:
         )
 
     @DbPersist(_db)
-    def insert_transfer_history(self, in_from: Enum, rmt_mode: RmtMode, in_path, out_path, dest, media_info):
+    def insert_transfer_history(self, in_from: Enum, rmt_mode: RmtMode, in_path, out_path, dest, media_info, category):
         """
         插入识别转移记录
         """
@@ -142,7 +142,7 @@ class DbHelper:
             TRANSFERHISTORY(
                 MODE=str(rmt_mode.value),
                 TYPE=media_info.type.value,
-                CATEGORY=media_info.category,
+                CATEGORY=media_info.category if not category else category,
                 TMDBID=int(media_info.tmdb_id),
                 TITLE=title,
                 YEAR=media_info.year,

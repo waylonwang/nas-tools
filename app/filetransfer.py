@@ -671,8 +671,9 @@ class FileTransfer:
                     success_flag = False
                     error_message = "无法识别媒体信息"
                     self.progress.update(ptype=ProgressKey.FileTransfer, text=error_message)
-                    if udf_flag:
-                        return __finish_transfer(success_flag, error_message)
+                    # 测试版本忽略自定义转移，未识别不退出，继续下一个文件，正式版本取消注释
+                    # if udf_flag:
+                    #     return __finish_transfer(success_flag, error_message)
                     # 记录未识别
                     is_need_insert_unknown = self.dbhelper.is_need_insert_transfer_unknown(reg_path)
                     if is_need_insert_unknown:
@@ -713,106 +714,74 @@ class FileTransfer:
                 if dist_path and not os.path.exists(dist_path) and rmt_mode not in ModuleConf.REMOTE_RMT_MODES:
                     return __finish_transfer(False, "目录不存在：%s" % dist_path)
 
-                # 判断文件是否已存在，返回：目录存在标志、目录名、文件存在标志、文件名
-                dir_exist_flag, ret_dir_path, file_exist_flag, ret_file_path = self.__is_media_exists(dist_path, media)
-                # 新文件后缀
-                file_ext = os.path.splitext(file_item)[-1]
-                new_file = ret_file_path
-                # 已存在的文件数量
-                exist_filenum = 0
-                handler_flag = False
-                # 路径存在
-                if dir_exist_flag:
-                    # 蓝光原盘
-                    if bluray_disk_dir:
-                        log.warn("【Rmt】蓝光原盘目录已存在：%s" % ret_dir_path)
-                        if udf_flag:
-                            return __finish_transfer(False, "蓝光原盘目录已存在：%s" % ret_dir_path)
-                        failed_count += 1
-                        continue
-                    # 文件存在
-                    if file_exist_flag:
-                        exist_filenum = exist_filenum + 1
-                        if rmt_mode != RmtMode.SOFTLINK:
-                            orgin_file_size = os.path.getsize(ret_file_path)
-                            if media.size > orgin_file_size and self._filesize_cover or udf_flag:
-                                # 原文件
-                                old_file = ret_file_path
-                                # 拆分后缀
-                                ret_file_path, ret_file_ext = os.path.splitext(ret_file_path)
-                                # 新文件
-                                new_file = "%s%s" % (ret_file_path, file_ext)
-                                # 覆盖
-                                log.info(
-                                    f"【Rmt】文件 {old_file} 已存在，原文件大小：{orgin_file_size}，新文件大小：{media.size}，覆盖为 {new_file} ...")
-                                ret = self.__transfer_file(file_item=file_item,
-                                                           new_file=new_file,
-                                                           rmt_mode=rmt_mode,
-                                                           over_flag=True,
-                                                           old_file=old_file)
-                                if ret != 0:
-                                    success_flag = False
-                                    error_message = "文件转移失败，错误码 %s" % ret
-                                    self.progress.update(ptype=ProgressKey.FileTransfer, text=error_message)
-                                    if udf_flag:
-                                        return __finish_transfer(success_flag, error_message)
+                
+                # 电影进行多类别处理，电视剧或者动漫不处理多类别，按单一分类处理
+                multi_categories = media.multi_categories if media.type == MediaType.MOVIE else [media.category]
+                # 按多类别进行遍历
+                for category in multi_categories:
+                    # 判断文件是否已存在，返回：目录存在标志、目录名、文件存在标志、文件名
+                    dir_exist_flag, ret_dir_path, file_exist_flag, ret_file_path = self.__is_media_exists(dist_path, media, category)
+                    # 新文件后缀
+                    file_ext = os.path.splitext(file_item)[-1]
+                    new_file = ret_file_path
+                    # 已存在的文件数量
+                    exist_filenum = 0
+                    handler_flag = False
+                    # 路径存在
+                    if dir_exist_flag:
+                        # 蓝光原盘
+                        if bluray_disk_dir:
+                            log.warn("【Rmt】蓝光原盘目录已存在：%s" % ret_dir_path)
+                            if udf_flag:
+                                return __finish_transfer(False, "蓝光原盘目录已存在：%s" % ret_dir_path)
+                            failed_count += 1
+                            continue
+                        # 文件存在
+                        if file_exist_flag:
+                            exist_filenum = exist_filenum + 1
+                            if rmt_mode != RmtMode.SOFTLINK:
+                                orgin_file_size = os.path.getsize(ret_file_path)
+                                if media.size > orgin_file_size and self._filesize_cover or udf_flag:
+                                    # 原文件
+                                    old_file = ret_file_path
+                                    # 拆分后缀
+                                    ret_file_path, ret_file_ext = os.path.splitext(ret_file_path)
+                                    # 新文件
+                                    new_file = "%s%s" % (ret_file_path, file_ext)
+                                    # 覆盖
+                                    log.info(
+                                        f"【Rmt】文件 {old_file} 已存在，原文件大小：{orgin_file_size}，新文件大小：{media.size}，覆盖为 {new_file} ...")
+                                    ret = self.__transfer_file(file_item=file_item,
+                                                            new_file=new_file,
+                                                            rmt_mode=rmt_mode,
+                                                            over_flag=True,
+                                                            old_file=old_file)
+                                    if ret != 0:
+                                        success_flag = False
+                                        error_message = "文件转移失败，错误码 %s" % ret
+                                        self.progress.update(ptype=ProgressKey.FileTransfer, text=error_message)
+                                        if udf_flag:
+                                            return __finish_transfer(success_flag, error_message)
+                                        failed_count += 1
+                                        alert_count += 1
+                                        if error_message not in alert_messages:
+                                            alert_messages.append(error_message)
+                                        continue
+                                    handler_flag = True
+                                else:
+                                    log.warn("【Rmt】文件 %s 已存在" % ret_file_path)
                                     failed_count += 1
-                                    alert_count += 1
-                                    if error_message not in alert_messages:
-                                        alert_messages.append(error_message)
                                     continue
-                                handler_flag = True
                             else:
                                 log.warn("【Rmt】文件 %s 已存在" % ret_file_path)
                                 failed_count += 1
                                 continue
-                        else:
-                            log.warn("【Rmt】文件 %s 已存在" % ret_file_path)
-                            failed_count += 1
-                            continue
-                # 路径不存在
-                else:
-                    if not ret_dir_path:
-                        log.error("【Rmt】拼装目录路径错误，无法从文件名中识别出季集信息：%s" % file_item)
-                        success_flag = False
-                        error_message = "识别失败，无法从文件名中识别出季集信息"
-                        self.progress.update(ptype=ProgressKey.FileTransfer, text=error_message)
-                        if udf_flag:
-                            return __finish_transfer(success_flag, error_message)
-                        # 记录未识别
-                        is_need_insert_unknown = self.dbhelper.is_need_insert_transfer_unknown(reg_path)
-                        if is_need_insert_unknown:
-                            self.dbhelper.insert_transfer_unknown(reg_path, target_dir, rmt_mode)
-                            alert_count += 1
-                        failed_count += 1
-                        if error_message not in alert_messages and is_need_insert_unknown:
-                            alert_messages.append(error_message)
-                        continue
-                    elif rmt_mode not in ModuleConf.REMOTE_RMT_MODES:
-                        # 创建目录
-                        log.debug("【Rmt】正在创建目录：%s" % ret_dir_path)
-                        os.makedirs(ret_dir_path)
-                # 转移蓝光原盘
-                if bluray_disk_dir:
-                    ret = self.__transfer_bluray_dir(file_item, ret_dir_path, rmt_mode)
-                    if ret != 0:
-                        success_flag = False
-                        error_message = "蓝光目录转移失败，错误码：%s" % ret
-                        self.progress.update(ptype=ProgressKey.FileTransfer, text=error_message)
-                        if udf_flag:
-                            return __finish_transfer(success_flag, error_message)
-                        failed_count += 1
-                        alert_count += 1
-                        if error_message not in alert_messages:
-                            alert_messages.append(error_message)
-                        continue
-                else:
-                    # 开始转移文件
-                    if not handler_flag:
-                        if not ret_file_path:
-                            log.error("【Rmt】拼装文件路径错误，无法从文件名中识别出集数：%s" % file_item)
+                    # 路径不存在
+                    else:
+                        if not ret_dir_path:
+                            log.error("【Rmt】拼装目录路径错误，无法从文件名中识别出季集信息：%s" % file_item)
                             success_flag = False
-                            error_message = "识别失败，无法从文件名中识别出集数"
+                            error_message = "识别失败，无法从文件名中识别出季集信息"
                             self.progress.update(ptype=ProgressKey.FileTransfer, text=error_message)
                             if udf_flag:
                                 return __finish_transfer(success_flag, error_message)
@@ -825,14 +794,16 @@ class FileTransfer:
                             if error_message not in alert_messages and is_need_insert_unknown:
                                 alert_messages.append(error_message)
                             continue
-                        new_file = "%s%s" % (ret_file_path, file_ext)
-                        ret = self.__transfer_file(file_item=file_item,
-                                                   new_file=new_file,
-                                                   rmt_mode=rmt_mode,
-                                                   over_flag=False)
+                        elif rmt_mode not in ModuleConf.REMOTE_RMT_MODES:
+                            # 创建目录
+                            log.debug("【Rmt】正在创建目录：%s" % ret_dir_path)
+                            os.makedirs(ret_dir_path)
+                    # 转移蓝光原盘
+                    if bluray_disk_dir:
+                        ret = self.__transfer_bluray_dir(file_item, ret_dir_path, rmt_mode)
                         if ret != 0:
                             success_flag = False
-                            error_message = "文件转移失败，错误码 %s" % ret
+                            error_message = "蓝光目录转移失败，错误码：%s" % ret
                             self.progress.update(ptype=ProgressKey.FileTransfer, text=error_message)
                             if udf_flag:
                                 return __finish_transfer(success_flag, error_message)
@@ -841,60 +812,99 @@ class FileTransfer:
                             if error_message not in alert_messages:
                                 alert_messages.append(error_message)
                             continue
-                # 查询TMDB详情，需要全部数据
-                media.set_tmdb_info(self.media.get_tmdb_info(mtype=media.type,
-                                                             tmdbid=media.tmdb_id,
-                                                             append_to_response="all"))
-                # 输出路径
-                out_path = new_file if not bluray_disk_dir else ret_dir_path
-                # 转移历史记录
-                self.dbhelper.insert_transfer_history(
-                    in_from=in_from,
-                    rmt_mode=rmt_mode,
-                    in_path=reg_path,
-                    out_path=out_path,
-                    dest=dist_path,
-                    media_info=media)
-                # 未识别手动识别或历史记录重新识别的批处理模式
-                if isinstance(episode[1], bool) and episode[1]:
-                    # 未识别手动识别，更改未识别记录为已处理
-                    self.update_transfer_unknown_state(file_item)
-                # 电影立即发送消息
-                if media.type == MediaType.MOVIE:
-                    if self._simplify_library_notification:
-                        self.message.send_simplify_transfer_movie_message(in_from,
-                                                             media,
-                                                             exist_filenum,
-                                                             self._movie_category_flag)
                     else:
-                        self.message.send_transfer_movie_message(in_from,
-                                                                 media,
-                                                                 exist_filenum,
-                                                                 self._movie_category_flag)
-                # 否则登记汇总发消息
-                else:
-                    # 按季汇总
-                    message_key = "%s-%s" % (media.get_title_string(), media.get_season_string())
-                    if not message_medias.get(message_key):
-                        message_medias[message_key] = media
-                    # 汇总集数、大小
-                    if not message_medias[message_key].is_in_episode(media.get_episode_list()):
-                        message_medias[message_key].total_episodes += media.total_episodes
-                        message_medias[message_key].size += media.size
-                # 生成nfo及poster
-                if bluray_disk_dir and media.type == MediaType.MOVIE:
-                    # 原盘文件的情况下 使用目录名称.nfo 生成
-                    self.scraper.gen_scraper_files(media=media,
-                                                   dir_path=ret_dir_path,
-                                                   file_name=os.path.basename(ret_dir_path),
-                                                   file_ext=file_ext,
-                                                   rmt_mode=rmt_mode)
-                else:
-                    self.scraper.gen_scraper_files(media=media,
-                                                   dir_path=ret_dir_path,
-                                                   file_name=os.path.basename(ret_file_path),
-                                                   file_ext=file_ext,
-                                                   rmt_mode=rmt_mode)
+                        # 开始转移文件
+                        if not handler_flag:
+                            if not ret_file_path:
+                                log.error("【Rmt】拼装文件路径错误，无法从文件名中识别出集数：%s" % file_item)
+                                success_flag = False
+                                error_message = "识别失败，无法从文件名中识别出集数"
+                                self.progress.update(ptype=ProgressKey.FileTransfer, text=error_message)
+                                if udf_flag:
+                                    return __finish_transfer(success_flag, error_message)
+                                # 记录未识别
+                                is_need_insert_unknown = self.dbhelper.is_need_insert_transfer_unknown(reg_path)
+                                if is_need_insert_unknown:
+                                    self.dbhelper.insert_transfer_unknown(reg_path, target_dir, rmt_mode)
+                                    alert_count += 1
+                                failed_count += 1
+                                if error_message not in alert_messages and is_need_insert_unknown:
+                                    alert_messages.append(error_message)
+                                continue
+                            new_file = "%s%s" % (ret_file_path, file_ext)
+                            ret = self.__transfer_file(file_item=file_item,
+                                                    new_file=new_file,
+                                                    rmt_mode=rmt_mode,
+                                                    over_flag=False)
+                            if ret != 0:
+                                success_flag = False
+                                error_message = "文件转移失败，错误码 %s" % ret
+                                self.progress.update(ptype=ProgressKey.FileTransfer, text=error_message)
+                                if udf_flag:
+                                    return __finish_transfer(success_flag, error_message)
+                                failed_count += 1
+                                alert_count += 1
+                                if error_message not in alert_messages:
+                                    alert_messages.append(error_message)
+                                continue
+                    # 查询TMDB详情，需要全部数据
+                    media.set_tmdb_info(self.media.get_tmdb_info(mtype=media.type,
+                                                                tmdbid=media.tmdb_id,
+                                                                append_to_response="all"))
+                    # 输出路径
+                    out_path = new_file if not bluray_disk_dir else ret_dir_path
+                    # 转移历史记录
+                    self.dbhelper.insert_transfer_history(
+                        in_from=in_from,
+                        rmt_mode=rmt_mode,
+                        in_path=reg_path,
+                        out_path=out_path,
+                        dest=dist_path,
+                        media_info=media,
+                        category=category)
+                    # 未识别手动识别或历史记录重新识别的批处理模式
+                    if isinstance(episode[1], bool) and episode[1]:
+                        # 未识别手动识别，更改未识别记录为已处理
+                        self.update_transfer_unknown_state(file_item)
+                    # 电影立即发送消息
+                    if media.type == MediaType.MOVIE:
+                        if self._simplify_library_notification:
+                            self.message.send_simplify_transfer_movie_message(in_from,
+                                                                media,
+                                                                exist_filenum,
+                                                                self._movie_category_flag)
+                        else:
+                            self.message.send_transfer_movie_message(in_from,
+                                                                    media,
+                                                                    exist_filenum,
+                                                                    self._movie_category_flag)
+                    # 否则登记汇总发消息
+                    else:
+                        # 按季汇总
+                        message_key = "%s-%s" % (media.get_title_string(), media.get_season_string())
+                        if not message_medias.get(message_key):
+                            message_medias[message_key] = media
+                        # 汇总集数、大小
+                        if not message_medias[message_key].is_in_episode(media.get_episode_list()):
+                            message_medias[message_key].total_episodes += media.total_episodes
+                            message_medias[message_key].size += media.size
+                    # 生成nfo及poster
+                    if bluray_disk_dir and media.type == MediaType.MOVIE:
+                        # 原盘文件的情况下 使用目录名称.nfo 生成
+                        self.scraper.gen_scraper_files(media=media,
+                                                    dir_path=ret_dir_path,
+                                                    file_name=os.path.basename(ret_dir_path),
+                                                    file_ext=file_ext,
+                                                    rmt_mode=rmt_mode)
+                    else:
+                        self.scraper.gen_scraper_files(media=media,
+                                                    dir_path=ret_dir_path,
+                                                    file_name=os.path.basename(ret_file_path),
+                                                    file_ext=file_ext,
+                                                    rmt_mode=rmt_mode)
+                    # 更新类别进度
+                    self.progress.update(ptype="filetransfer",text="[%s] %s 转移完成" % (category, file_name))
+                
                 # 更新进度
                 self.progress.update(ptype=ProgressKey.FileTransfer,
                                      value=round(total_count / len(Medias) * 100),
@@ -988,11 +998,13 @@ class FileTransfer:
 
     def __is_media_exists(self,
                           media_dest,
-                          media):
+                          media,
+                          category):
         """
         判断媒体文件是否忆存在
         :param media_dest: 媒体文件所在目录
         :param media: 已识别的媒体信息
+        :param category: 使用传入的分类，用于处理多类别，如未传入则使用媒体本身的分类        
         :return: 目录是否存在，目录路径，文件是否存在，文件路径
         """
         # 返回变量
@@ -1000,16 +1012,20 @@ class FileTransfer:
         file_exist_flag = False
         ret_dir_path = None
         ret_file_path = None
+        # 未传入分类则使用媒体本身的分类
+        category = media.category if not category else category
         # 电影
         if media.type == MediaType.MOVIE:
             # 目录名称
             dir_name, file_name = self.get_moive_dest_path(media)
+            # 如果存在系列，则在路径中增加系列
+            dir_name = os.path.join(media.movie_collection, dir_name) if media.movie_collection else dir_name
             # 默认目录路径
             file_path = os.path.join(media_dest, dir_name)
             # 开启分类时目录路径
             if self._movie_category_flag:
-                file_path = os.path.join(media_dest, media.category, dir_name)
-                for m_type in [RMT_FAVTYPE, media.category]:
+                file_path = os.path.join(media_dest, category, dir_name)
+                for m_type in [RMT_FAVTYPE, category]:
                     type_path = os.path.join(media_dest, m_type, dir_name)
                     # 目录是否存在
                     if os.path.exists(type_path):
@@ -1038,7 +1054,7 @@ class FileTransfer:
             # 剧集目录
             if (media.type == MediaType.TV and self._tv_category_flag) or (
                     media.type == MediaType.ANIME and self._anime_category_flag):
-                media_path = os.path.join(media_dest, media.category, dir_name)
+                media_path = os.path.join(media_dest, category, dir_name)
             else:
                 media_path = os.path.join(media_dest, dir_name)
             # 季

@@ -149,6 +149,13 @@ class Category:
             for attr, value in item.items():
                 if not value:
                     continue
+                
+                # ^开头为逆向匹配，获取attr的真正名称
+                reverse_condition = False
+                if attr.startswith("^"):
+                    reverse_condition = True
+                    attr = attr[1:]
+
                 info_value = tmdb_info.get(attr)
                 if not info_value:
                     match_flag = False
@@ -168,6 +175,83 @@ class Category:
 
                 if not set(values).intersection(set(info_values)):
                     match_flag = False
+                    
+                # 如果逆向匹配则反转结果
+                match_flag = not match_flag if reverse_condition else match_flag
             if match_flag:
                 return key
         return ""
+
+    def get_multi_categories(self, tmdb_info):
+        """
+        根据 TMDB信息与分类配置文件进行比较，确定所有的类别
+        :param tmdb_info: TMDB信息
+        :return: 多类别的名称数组
+        """
+        if not tmdb_info:
+            return []
+        if not self._movie_categorys:
+            return []
+        multi_categories = []
+        for key, item in self._movie_categorys.items():
+            if not item:
+                # “其他”类别最后匹配，因此如果第一个匹配到的是“其他”类型说明没有匹配到“其他”之外的类型，此时可以添加“其他”到多类别
+                # 反之只要有“其他”之外的类型已经匹配，则不添加“其他”到多类别                
+                if len(multi_categories) == 0 or not key.startswith("其他"):
+                    multi_categories.append(key)
+                else:
+                    log.info(f"【Meta】「其他」非唯一类别，忽略「{key}」，不添加多类别")
+                continue
+            match_flag = True
+            for attr, value in item.items():
+                if not value:
+                    continue
+                
+                # ^开头为逆向匹配，获取attr的真正名称
+                reverse_condition = False
+                if attr.startswith("^"):
+                    reverse_condition = True
+                    attr = attr[1:]
+                    
+                info_value = tmdb_info.get(attr)
+                if not info_value:
+                    match_flag = False
+                    continue
+                elif attr == "production_countries":
+                    # 拆分国家，非国产的即便包含'CN','HK','TW'，也忽略，否则包含'CN','HK','TW'的非国产会被归类到国产片
+                    domestic = []
+                    non_domestic = []
+                    for val in info_value:
+                        country = str(val.get("iso_3166_1")).upper()
+                        if country in ['CN','HK','TW']:
+                            domestic.append(country)
+                        else:
+                            non_domestic.append(country)
+                    info_values = non_domestic if len(non_domestic) > 0 else domestic
+                else:
+                    if isinstance(info_value, list):
+                        info_values = [str(val).upper() for val in info_value]
+                    else:
+                        info_values = [str(info_value).upper()]
+
+                if value.find(",") != -1:
+                    values = [str(val).upper() for val in value.split(",")]
+                else:
+                    values = [str(value).upper()]
+
+                if not set(values).intersection(set(info_values)):
+                    match_flag = False
+                    
+                # 如果逆向匹配则反转结果
+                match_flag = not match_flag if reverse_condition else match_flag
+                
+            if match_flag:
+                # “其他”类别最后匹配，因此如果第一个匹配到的是“其他”类型说明没有匹配到“其他”之外的类型，此时可以添加“其他”到多类别
+                # 反之只要有“其他”之外的类型已经匹配，则不添加“其他”到多类别
+                if len(multi_categories) == 0 or not key.startswith("其他"):
+                    multi_categories.append(key)
+                else:
+                    log.info(f"【Meta】「其他」非唯一类别，忽略「{key}」，不添加多类别")
+
+        log.info(f"【Meta】识别到多类别：{multi_categories}")
+        return multi_categories
