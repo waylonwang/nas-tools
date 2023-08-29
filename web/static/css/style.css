@@ -29,13 +29,18 @@ body, .page {
 }
 
 #mediafile_tree {
-    overflow-y: auto;
+    overflow: auto !important;
+    max-width: 300px;
     max-height: 600px;
+}
+
+UL.jqueryFileTree {
+    padding: 0px 5px;
 }
 
 .theme-light .jqueryFileTree LI.directory {
     background: url(../img/light/folder_close.png) left top 5px no-repeat;
-    white-space: normal !important;
+    white-space: nowrap !important;
     word-break: break-all;
 }
 
@@ -61,7 +66,7 @@ body, .page {
 
 .theme-dark .jqueryFileTree LI.directory {
     background: url(../img/dark/folder_close.png) left top 5px no-repeat;
-    white-space: normal !important;
+    white-space: nowrap !important;
     word-break: break-all;
 }
 
