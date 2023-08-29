@@ -8,7 +8,6 @@ import time
 import traceback
 import urllib
 import xml.dom.minidom
-import hashlib
 from functools import wraps
 from math import floor
 from pathlib import Path
@@ -1077,30 +1076,8 @@ def dirlist():
             if not f:
                 f = ff
             if os.path.isdir(ff):
-                # 对同步目录进行特殊处理
-                sync_class = ""
-                link_path = ""
-                link_direction = ""
-                sync_dirs = Sync().get_hardlinks_sync_dirs()     
-                for dir in sync_dirs:
-                    if ff.startswith(dir[0]):
-                        if ff == dir[0]:
-                            link_path = f'<span class="link-folder">{SystemUtils.shorten_path(dir[1])}</span>'
-                            link_direction = '<span class="link-direction" direction="→">→</span>'
-                        sync_class = "sync-src"
-                        break
-                    elif ff.startswith(dir[1]):
-                        if ff == dir[1]:
-                            link_path = f'<span class="link-folder">{SystemUtils.shorten_path(dir[0])}</span>'
-                            link_direction = '<span class="link-direction" direction="←">←</span>'
-                        sync_class = "sync-dest"
-                        break
-                
-                # id用于前端选择后判断是否同步目录
-                path = ff.replace("\\", "/") + "/"
-                id = hashlib.md5(path.encode()).hexdigest()                
-                r.append('<li id="%s" class="directory %s collapsed"><a rel="%s">%s%s%s</a></li>' % (
-                    id, sync_class, path, f.replace("\\", "/"), link_direction, link_path))
+                r.append('<li class="directory collapsed"><a rel="%s/">%s</a></li>' % (
+                    ff.replace("\\", "/"), f.replace("\\", "/")))
             else:
                 if ft != "HIDE_FILES_FILTER":
                     e = os.path.splitext(f)[1][1:]
