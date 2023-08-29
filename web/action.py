@@ -9,6 +9,7 @@ import shutil
 import signal
 import sqlite3
 import time
+import hashlib
 from math import floor
 from pathlib import Path
 from urllib.parse import unquote
@@ -4110,7 +4111,7 @@ class WebAction:
                             "rel": os.path.dirname(ff).replace("\\", "/"),
                             "ext": ext,
                             "size": StringUtils.str_filesize(os.path.getsize(ff)),
-                            "linkid": StringUtils.md5_hash(ff)
+                            "linkid": hashlib.md5(ff.encode()).hexdigest()
                         })
 
         except Exception as e:
@@ -4153,7 +4154,7 @@ class WebAction:
                     break     
                                     
             r={
-                "linkid": StringUtils.md5_hash(file),
+                "linkid": hashlib.md5(file.encode()).hexdigest(),
                 "direction": direction,
                 "hardlinks": hardlinks
             }

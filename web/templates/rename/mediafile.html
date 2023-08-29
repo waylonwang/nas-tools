@@ -29,7 +29,7 @@
           <div class="card-body py-0 border-0">
             <div class="d-flex flex-column flex-md-row justify-content-md-between">
               <div class="text-muted align-self-center">
-                共 <span id="mediafile_num">0</span> 个文件 <span id="mediafile_folder_sync"></span>
+                共 <span id="mediafile_num">0</span> 个文件
               </div>
               <div class="align-self-center">
                 <a href="javascript:mediafile_transfer_all()" class="btn btn-primary" title="转移当前目录">
@@ -145,13 +145,11 @@
 
   //刷新文件列表
   function refresh_files(folder) {
-    // 文件夹路径转换为Base64后找到目录树节点
-    let data = new TextEncoder().encode(folder);
-    let node = $(`#mediafile_tree #${btoa(String.fromCharCode(...data)).replaceAll("=","")}`);
-    // 依据节点的类更新文件夹同步标识
-    if (node && node.hasClass("sync-src")) {
+    let id = CryptoJS.MD5(folder).toString();
+    let node = $(`#mediafile_tree #${id}`);
+    if (node.hasClass("sync-src")) {
       $("#mediafile_folder_sync").attr("direction", "→").text("硬链接同步来源目录");
-    } else if (node && node.hasClass("sync-dest")) {
+    } else if (node.hasClass("sync-dest")) {
       $("#mediafile_folder_sync").attr("direction", "←").text("硬链接同步目标目录");
     } else {
       $("#mediafile_folder_sync").removeAttr("direction").text("");

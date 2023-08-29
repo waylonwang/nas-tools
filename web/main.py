@@ -8,7 +8,7 @@ import time
 import traceback
 import urllib
 import xml.dom.minidom
-import base64
+import hashlib
 from functools import wraps
 from math import floor
 from pathlib import Path
@@ -1096,9 +1096,9 @@ def dirlist():
                         sync_class = "sync-dest"
                         break
                 
+                # id用于前端选择后判断是否同步目录
                 path = ff.replace("\\", "/") + "/"
-                # 将文件夹路径转换为Base64后存为id，用于前端选择后更新文件夹同步标识
-                id = base64.b64encode(path.encode()).decode('utf-8').replace("=","")
+                id = hashlib.md5(path.encode()).hexdigest()                
                 r.append('<li id="%s" class="directory %s collapsed"><a rel="%s">%s%s%s</a></li>' % (
                     id, sync_class, path, f.replace("\\", "/"), link_direction, link_path))
             else:
