@@ -57,6 +57,10 @@ class MetaBase(object):
     audio_encode = None
     # 二级分类
     category = ""
+    # 多类别表
+    multi_categories = []
+    # 电影系列
+    movie_collection = None    
     # TMDB ID
     tmdb_id = 0
     # IMDB ID
@@ -550,6 +554,11 @@ class MetaBase(object):
             if self.release_date:
                 self.year = self.release_date[0:4]
             self.category = self.category_handler.get_movie_category(info)
+            # 多类别
+            self.multi_categories = self.category_handler.get_multi_categories(info)
+            # 系列
+            collection = info.get("belongs_to_collection")
+            self.movie_collection = collection.get("name") if collection else None
         else:
             self.title = info.get('name')
             self.original_title = info.get('original_name')
