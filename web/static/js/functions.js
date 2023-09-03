@@ -1441,7 +1441,7 @@ function media_name_test_ui(data, result_div) {
   // 希望chips按此数组的顺序生成..
   $(`#${result_div}`).empty();
   const sort_array = ["rev_string", "ignored_words", "replaced_words", "offset_words",
-    "type", "category", "multi_categories", "name", "title", "movie_ollection", "tmdbid", "year", "season_episode", "part",
+    "type", "category", "multi_categories", "name", "title", "movie_collection", "tmdbid", "year", "season_episode", "part",
     "restype", "effect", "pix", "video_codec", "audio_codec", "team", "customization"]
   // 调用组件实例的自定义方法.. 一次性添加chips
   document.querySelector(`#${result_div}`).add_chips_all(sort_array, data);
